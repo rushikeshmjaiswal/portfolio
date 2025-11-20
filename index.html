@@ -16,10 +16,11 @@
     .skills span { display:inline-block; padding:6px 12px; margin:5px; background:#e9fdfc; border-radius:5px; border:1px solid #0ea5a4; font-size:14px; }
     .project { padding:10px 0; border-bottom:1px solid #eee; }
     .project:last-child { border-bottom:none; }
-    input, textarea { width:100%; padding:12px; margin:10px 0; border:1px solid #ccc; border-radius:5px; }
+    input, textarea { width:100%; padding:12px; margin:10px 0; border:1px solid #ccc; border-radius:5px; box-sizing:border-box; }
     button { padding:12px 20px; background:#0ea5a4; color:white; border:none; border-radius:5px; cursor:pointer; }
     button:hover { background:#0c8f8e; }
     footer { text-align:center; padding:20px; font-size:14px; color:#777; }
+    .status { margin-left:8px; font-size:13px; color:#555; }
   </style>
 </head>
 <body>
@@ -78,18 +79,98 @@
   <!-- CONTACT FORM -->
   <section id="contact">
     <h2>Contact Me</h2>
-    <form>
-      <input type="text" placeholder="Your name" required>
-      <input type="email" placeholder="Your email" required>
-      <textarea rows="4" placeholder="Your message" required></textarea>
-      <button type="submit">Send Message</button>
+    <form id="contactForm">
+      <input id="name" type="text" placeholder="Your name" required>
+      <input id="email" type="email" placeholder="Your email" required>
+      <textarea id="message" rows="4" placeholder="Your message" required></textarea>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="submit">Send Message</button>
+        <div id="formStatus" class="status"></div>
+      </div>
     </form>
   </section>
 
   <!-- FOOTER -->
   <footer>
-    © 2025 Rushikesh — Built with ❤️
+    © <span id="year"></span> Rushikesh — Built with ❤️
   </footer>
 
+  <!-- ========== Firebase SDKs (Compat) ========== -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  <!-- (optional) analytics included if you want -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-analytics-compat.js"></script>
+
+  <script>
+    // ---------- Firebase config (your project's values) ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBRPOfZ03gM5yUMQaFQ3IQrUg6eTsSLJOc",
+      authDomain: "rj-ai-project-1b5bf.firebaseapp.com",
+      projectId: "rj-ai-project-1b5bf",
+      storageBucket: "rj-ai-project-1b5bf.firebasestorage.app",
+      messagingSenderId: "728590300632",
+      appId: "1:728590300632:web:2a4c2b13f439626cc56ead",
+      measurementId: "G-GVR8K7D9J3"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    // optional analytics
+    if (firebase.analytics) {
+      try { firebase.analytics(); } catch(e){/* ignore if not needed */ }
+    }
+
+    // footer year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // contact form handling: save to Firestore 'leads'
+    const contactForm = document.getElementById('contactForm');
+    const statusEl = document.getElementById('formStatus');
+
+    contactForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = '';
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const message = document.getElementById('message').value.trim();
+
+      if (!name || !email || !message) {
+        statusEl.textContent = 'Please complete all fields.';
+        return;
+      }
+
+      // basic email check
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        statusEl.textContent = 'Please enter a valid email.';
+        return;
+      }
+
+      // show sending state
+      const originalBtn = contactForm.querySelector('button[type="submit"]');
+      originalBtn.disabled = true;
+      originalBtn.textContent = 'Sending...';
+      statusEl.textContent = '';
+
+      try {
+        await db.collection('leads').add({
+          name,
+          email,
+          message,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        statusEl.textContent = 'Message sent — thank you!';
+        contactForm.reset();
+      } catch (err) {
+        console.error('Firestore save error:', err);
+        statusEl.textContent = 'Error sending message. Try again later.';
+      } finally {
+        originalBtn.disabled = false;
+        originalBtn.textContent = 'Send Message';
+      }
+    });
+  </script>
 </body>
 </html>
