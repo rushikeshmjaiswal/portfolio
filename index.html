@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rushikesh Jaiswal - Portfolio</title>
+
   <style>
     body { font-family: Arial, sans-serif; margin:0; background:#f7f7f7; color:#333; }
     header { background:#0ea5a4; padding:40px 20px; color:white; text-align:center; }
@@ -83,6 +84,7 @@
       <input id="name" type="text" placeholder="Your name" required>
       <input id="email" type="email" placeholder="Your email" required>
       <textarea id="message" rows="4" placeholder="Your message" required></textarea>
+
       <div style="display:flex; align-items:center; gap:8px;">
         <button type="submit">Send Message</button>
         <div id="formStatus" class="status"></div>
@@ -95,15 +97,12 @@
     © <span id="year"></span> Rushikesh — Built with ❤️
   </footer>
 
-  <!-- ========== Firebase SDKs (Compat) ========== -->
+
+  <!-- 🌟 FIREBASE (No Analytics, CSP Safe) -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-  <!-- (optional) analytics included if you want -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-analytics-compat.js"></script>
 
   <script>
-    // ---------- Firebase config (your project's values) ----------
     const firebaseConfig = {
       apiKey: "AIzaSyBRPOfZ03gM5yUMQaFQ3IQrUg6eTsSLJOc",
       authDomain: "rj-ai-project-1b5bf.firebaseapp.com",
@@ -114,24 +113,19 @@
       measurementId: "G-GVR8K7D9J3"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // optional analytics
-    if (firebase.analytics) {
-      try { firebase.analytics(); } catch(e){/* ignore if not needed */ }
-    }
 
     // footer year
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    // contact form handling: save to Firestore 'leads'
+    // Save contact form to Firestore
     const contactForm = document.getElementById('contactForm');
     const statusEl = document.getElementById('formStatus');
 
     contactForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      statusEl.textContent = '';
+
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
       const message = document.getElementById('message').value.trim();
@@ -141,16 +135,9 @@
         return;
       }
 
-      // basic email check
-      if (!/^\S+@\S+\.\S+$/.test(email)) {
-        statusEl.textContent = 'Please enter a valid email.';
-        return;
-      }
-
-      // show sending state
-      const originalBtn = contactForm.querySelector('button[type="submit"]');
-      originalBtn.disabled = true;
-      originalBtn.textContent = 'Sending...';
+      const btn = contactForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
       statusEl.textContent = '';
 
       try {
@@ -164,13 +151,14 @@
         statusEl.textContent = 'Message sent — thank you!';
         contactForm.reset();
       } catch (err) {
-        console.error('Firestore save error:', err);
-        statusEl.textContent = 'Error sending message. Try again later.';
-      } finally {
-        originalBtn.disabled = false;
-        originalBtn.textContent = 'Send Message';
+        console.error(err);
+        statusEl.textContent = 'Error sending message.';
       }
+
+      btn.disabled = false;
+      btn.textContent = 'Send Message';
     });
   </script>
+
 </body>
 </html>
