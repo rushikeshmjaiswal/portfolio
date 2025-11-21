@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admin Dashboard — Leads</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin:20px; background:#f5f7fb; color:#222; }
+    .card { background:#fff; padding:16px; border-radius:8px; box-shadow:0 6px 18px rgba(20,20,30,0.06); margin-bottom:12px; }
+    .container { max-width:900px; margin: 0 auto; }
+    header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    button { padding:8px 12px; border-radius:6px; border:none; cursor:pointer; }
+    .btn-danger { background:#ef4444; color:white; }
+    .btn-primary { background:#0ea5a4; color:white; }
+    .input { padding:8px; border-radius:6px; border:1px solid #ddd; width:100%; box-sizing:border-box; }
+    .lead-row { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+    .lead-meta { color:#666; font-size:13px; }
+    .center { text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Admin Dashboard — Leads</h1>
+      <div id="authArea">
+        <!-- auth UI is injected here -->
+      </div>
+    </header>
+
+    <div id="content">
+      <div id="loader" class="center">Loading...</div>
+      <div id="dashboard" style="display:none;">
+        <div style="margin-bottom:12px;">
+          <button id="signOutBtn" class="btn-primary">Sign out</button>
+          <button id="refreshBtn" style="margin-left:8px;">Refresh</button>
+        </div>
+
+        <div id="list"></div>
+        <div id="empty" class="center" style="display:none;">No leads yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIREBASE SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ---------- CONFIG ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyBRPOfZ03gM5yUMQaFQ3IQrUg6eTsSLJOc",
+      authDomain: "rj-ai-project-1b5bf.firebaseapp.com",
+      projectId: "rj-ai-project-1b5bf",
+      storageBucket: "rj-ai-project-1b5bf.firebasestorage.app",
+      messagingSenderId: "728590300632",
+      appId: "1:728590300632:web:2a4c2b13f439626cc56ead",
+      measurementId: "G-GVR8K7D9J3"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ---------- ADMIN CONFIG ----------
+    // Put the admin email(s) allowed to access the dashboard here
+    // Replace with your actual admin email(s):
+    const ALLOWED_ADMINS = ["rushikeshmjaiswal123@gmail.com"];
+
+    // ---------- UI ELEMENTS ----------
+    const authArea = document.getElementById('authArea');
+    const loader = document.getElementById('loader');
+    const dashboard = document.getElementById('dashboard');
+    const listEl = document.getElementById('list');
+    const emptyEl = document.getElementById('empty');
+
+    // ---------- RENDER LOGIN FORM ----------
+    function renderLogin() {
+      authArea.innerHTML = `
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="adminEmail" class="input" placeholder="admin email" style="width:240px"/>
+          <input id="adminPass" class="input" placeholder="password" type="password" style="width:180px"/>
+          <button id="loginBtn" class="btn-primary">Sign in</button>
+        </div>
+        <div style="margin-top:6px; font-size:13px; color:#666;">
+          If you don't have an account, create one in Firebase Auth (email/password) and use that email here.
+        </div>
+      `;
+      document.getElementById('loginBtn').addEventListener('click', async () => {
+        const e = document.getElementById('adminEmail').value.trim();
+        const p = document.getElementById('adminPass').value;
+        if (!e || !p) { alert('Enter email & password'); return; }
+        try {
+          await auth.signInWithEmailAndPassword(e, p);
+        } catch(err) {
+          if (err.code === 'auth/user-not-found') {
+            // Offer to create user
+            if (confirm('User not found. Create new admin user with this email?')) {
+              try {
+                await auth.createUserWithEmailAndPassword(e, p);
+                alert('User created — please sign in again.');
+              } catch(createErr) {
+                alert('Create error: ' + createErr.message);
+              }
+            }
+          } else {
+            alert('Sign in error: ' + err.message);
+          }
+        }
+      });
+    }
+
+    // ---------- RENDER SIGNED-IN UI ----------
+    function renderSignedIn(user) {
+      authArea.innerHTML = `<div style="font-size:14px;">Signed in as <strong>${user.email}</strong></div>`;
+      dashboard.style.display = 'block';
+      loader.style.display = 'none';
+      document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+      document.getElementById('refreshBtn').addEventListener('click', loadLeads);
+    }
+
+    // ---------- CHECK AUTH STATE ----------
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        // show login
+        renderLogin();
+        dashboard.style.display = 'none';
+        loader.style.display = 'none';
+      } else {
+        // check if user is allowed
+        if (!ALLOWED_ADMINS.includes(user.email)) {
+          // Not allowed: sign out and show message
+          alert('This account is not authorized to access the admin dashboard. Please use the admin email.');
+          await auth.signOut();
+          renderLogin();
+          return;
+        }
+        renderSignedIn(user);
+        loadLeads();
+      }
+    });
+
+    // ---------- LOAD LEADS ----------
+    async function loadLeads() {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'none';
+      loader.style.display = 'none';
+      try {
+        const snapshot = await db.collection('leads').orderBy('createdAt','desc').get();
+        if (snapshot.empty) {
+          emptyEl.style.display = 'block';
+          return;
+        }
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const id = doc.id;
+          const createdAt = data.createdAt && data.createdAt.toDate ? data.createdAt.toDate().toLocaleString() : '';
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.innerHTML = `
+            <div class="lead-row">
+              <div style="flex:1">
+                <div style="font-weight:600">${escapeHtml(data.name || '—')}</div>
+                <div class="lead-meta">${escapeHtml(data.email || '')} · ${escapeHtml(createdAt)}</div>
+                <div style="margin-top:8px;">${escapeHtml(data.message || '')}</div>
+              </div>
+              <div style="width:120px; text-align:right;">
+                <button class="btn-danger" data-id="${id}">Delete</button>
+              </div>
+            </div>
+          `;
+          listEl.appendChild(el);
+        });
+
+        // attach delete handlers
+        listEl.querySelectorAll('.btn-danger').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            if (!confirm('Delete this lead?')) return;
+            try {
+              await db.collection('leads').doc(id).delete();
+              e.currentTarget.textContent = 'Deleted';
+              e.currentTarget.disabled = true;
+              loadLeads(); // reload
+            } catch(err) {
+              alert('Delete error: ' + err.message);
+            }
+          });
+        });
+
+      } catch(err) {
+        console.error('Load leads error', err);
+        alert('Error loading leads: ' + err.message);
+      }
+    }
+
+    // ---------- small helper ----------
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[s]));
+    }
+
+    // initial render
+    renderLogin();
+  </script>
+</body>
+</html>
