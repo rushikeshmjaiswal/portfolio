@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Caption Generator — Rushikesh</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding:24px; background:#f7f7f7; color:#222; }
+    .card { max-width:760px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.06);}
+    textarea { width:100%; min-height:120px; padding:12px; border-radius:6px; border:1px solid #ddd; box-sizing:border-box; }
+    button { margin-top:12px; padding:10px 16px; border:none; background:#0ea5a4; color:white; border-radius:6px; cursor:pointer; }
+    button:disabled { opacity:0.6; cursor:not-allowed; }
+    pre { white-space:pre-wrap; background:#f1f5f9; padding:12px; border-radius:6px; }
+    a.back { display:inline-block; margin-bottom:12px; color:#0ea5a4; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <a class="back" href="/">← Back to portfolio</a>
+    <h1>AI Caption Generator</h1>
+    <p>Describe the image, mood, or product and get short social captions.</p>
+
+    <label for="prompt">Describe (example: "cozy living room with warm lamps and plants")</label>
+    <textarea id="prompt" placeholder="e.g. cozy living room with warm lamp, wooden bed, and plants — dreamy evening mood"></textarea>
+
+    <div>
+      <button id="generateBtn">Generate captions</button>
+      <span id="status" style="margin-left:10px;color:#666"></span>
+    </div>
+
+    <h3 style="margin-top:18px">Results</h3>
+    <pre id="output">No captions yet.</pre>
+  </div>
+
+  <script>
+    const btn = document.getElementById('generateBtn');
+    const out = document.getElementById('output');
+    const status = document.getElementById('status');
+
+    async function callApi(prompt) {
+      const res = await fetch('/api/generate-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      return res;
+    }
+
+    btn.addEventListener('click', async () => {
+      const prompt = document.getElementById('prompt').value.trim();
+      if (!prompt) {
+        alert('Please enter a short description for the caption.');
+        return;
+      }
+      status.textContent = 'Sending…';
+      btn.disabled = true;
+      out.textContent = '';
+
+      try {
+        const res = await callApi(prompt);
+
+        if (!res.ok) {
+          let text;
+          try { text = await res.json(); } catch(e) { text = { error: res.statusText }; }
+          status.textContent = 'Error';
+          out.textContent = 'Server error: ' + (text && (text.error || text.details) ? (text.error || text.details) : res.statusText);
+          return;
+        }
+
+        const json = await res.json();
+        status.textContent = 'Done';
+        out.textContent = json.captions || 'No captions returned';
+      } catch (err) {
+        status.textContent = 'Error';
+        out.textContent = 'Request failed: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
