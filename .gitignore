@@ -1,1 +1,4 @@
-.env 
+.env
+.vercel
+.env*.local
+-e "\n# Local env files\n.env\n.env.*" 
